@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  REJECTED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SyncStatus {
+  PENDING
+  QUEUED
+  UPLOADING
+  RETRYING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SyncOperationType {
+  CREATE_WORK_PROOF
+}
+
+enum SyncLogStatus {
+  PENDING
+  QUEUED
+  UPLOADING
+  RETRYING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum CommentType {
+  INFO
+  ISSUE
+  BLOCKER
+  UPDATE
+}
+
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  industry  String?
+  users     User[]
+  tasks     Task[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("organizations")
+}
+
+model User {
+  id             String       @id @default(uuid())
+  name           String
+  email          String       @unique
+  phone          String?
+  passwordHash   String       @map("password_hash")
+  role           UserRole     @default(EMPLOYEE)
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  assignedTasks  Task[]       @relation("AssignedTasks")
+  createdTasks   Task[]       @relation("CreatedTasks")
+  workProofs     WorkProof[]
+  workSessions   WorkSession[]
+  taskComments   TaskComment[]
+  dailyReports   DailyReport[]
+  proofAttempts  WorkProofAttempt[]
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  title          String
+  description    String
+  priority       Priority     @default(MEDIUM)
+  status         TaskStatus   @default(PENDING)
+  startDate      DateTime?    @map("start_date")
+  dueDate        DateTime?    @map("due_date")
+  estimatedDurationMinutes Int? @map("estimated_duration_minutes")
+  versionNumber  Int          @default(1) @map("version_number")
+  recurrence     Recurrence   @default(NONE)
+  geofenceLatitude Float?     @map("geofence_latitude")
+  geofenceLongitude Float?    @map("geofence_longitude")
+  geofenceRadiusMeters Int?   @map("geofence_radius_meters")
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  assignedToId   String       @map("assigned_to_id")
+  assignedTo     User         @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedById   String       @map("assigned_by_id")
+  assignedBy     User         @relation("CreatedTasks", fields: [assignedById], references: [id])
+  workProofs     WorkProof[]
+  workSessions   WorkSession[]
+  comments       TaskComment[]
+  dailyReports   DailyReport[]
+  proofAttempts  WorkProofAttempt[]
+  checklistItems TaskChecklistItem[]
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("tasks")
+}
+
+model WorkProof {
+  id                 String             @id @default(uuid())
+  localUuid          String             @map("local_uuid")
+  taskId             String             @map("task_id")
+  task               Task               @relation(fields: [taskId], references: [id])
+  userId             String             @map("user_id")
+  user               User               @relation(fields: [userId], references: [id])
+  imageUrl           String?            @map("image_url")
+  imagePublicId      String?            @map("image_public_id")
+  watermarkText      String?            @map("watermark_text")
+  latitude           Float
+  longitude          Float
+  locationAccuracy   Float?             @map("location_accuracy")
+  outsideGeofence    Boolean            @default(false) @map("outside_geofence")
+  address            String?
+  capturedAt         DateTime           @map("captured_at")
+  serverReceivedAt   DateTime           @default(now()) @map("server_received_at")
+  remarks            String?
+  syncStatus         SyncStatus         @default(SYNCED) @map("sync_status")
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  dailyReport        DailyReport?
+  attempts           WorkProofAttempt[]
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  @@unique([userId, localUuid])
+  @@map("work_proofs")
+}
+
+model SyncLog {
+  id            String            @id @default(uuid())
+  localRecordId String            @map("local_record_id")
+  operationType SyncOperationType @map("operation_type")
+  payload       Json
+  retryCount    Int               @default(0) @map("retry_count")
+  status        SyncLogStatus     @default(QUEUED)
+  lastError     String?           @map("last_error")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@map("sync_logs")
+}
+
+model VerificationAudit {
+  id                 String             @id @default(uuid())
+  workProofId        String             @map("work_proof_id")
+  managerId          String             @map("manager_id")
+  verificationStatus VerificationStatus @map("verification_status")
+  reason             String?
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  @@map("verification_audits")
+}
+
+model WorkSession {
+  id           String        @id @default(uuid())
+  userId       String        @map("user_id")
+  user         User          @relation(fields: [userId], references: [id])
+  taskId       String        @map("task_id")
+  task         Task          @relation(fields: [taskId], references: [id])
+  checkInTime  DateTime      @map("check_in_time")
+  checkOutTime DateTime?     @map("check_out_time")
+  checkInLat   Float         @map("check_in_lat")
+  checkInLong  Float         @map("check_in_long")
+  checkOutLat  Float?        @map("check_out_lat")
+  checkOutLong Float?        @map("check_out_long")
+  sessionStatus SessionStatus @default(ACTIVE) @map("session_status")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("work_sessions")
+}
+
+model DailyReport {
+  id           String             @id @default(uuid())
+  taskId       String             @map("task_id")
+  task         Task               @relation(fields: [taskId], references: [id])
+  userId       String             @map("user_id")
+  user         User               @relation(fields: [userId], references: [id])
+  workProofId  String?            @unique @map("work_proof_id")
+  workProof    WorkProof?         @relation(fields: [workProofId], references: [id])
+  title        String
+  reportText   String             @map("report_text")
+  submittedAt  DateTime           @map("submitted_at")
+  syncStatus   SyncStatus         @default(SYNCED) @map("sync_status")
+  attachments  ReportAttachment[]
+  proofAttempts WorkProofAttempt[]
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@map("daily_reports")
+}
+
+model ReportAttachment {
+  id            String      @id @default(uuid())
+  dailyReportId String      @map("daily_report_id")
+  dailyReport   DailyReport @relation(fields: [dailyReportId], references: [id])
+  fileUrl       String      @map("file_url")
+  filePublicId  String?     @map("file_public_id")
+  fileName      String      @map("file_name")
+  fileType      String      @map("file_type")
+  fileSize      Int         @map("file_size")
+  uploadedAt    DateTime    @default(now()) @map("uploaded_at")
+
+  @@map("report_attachments")
+}
+
+model WorkProofAttempt {
+  id            String             @id @default(uuid())
+  localUuid     String             @map("local_uuid")
+  taskId        String             @map("task_id")
+  task          Task               @relation(fields: [taskId], references: [id])
+  proofVersion  Int                @map("proof_version")
+  submittedById String             @map("submitted_by")
+  submittedBy   User               @relation(fields: [submittedById], references: [id])
+  workProofId   String?            @map("work_proof_id")
+  workProof     WorkProof?         @relation(fields: [workProofId], references: [id])
+  imageUrl      String?            @map("image_url")
+  imagePublicId String?            @map("image_public_id")
+  watermarkText String?            @map("watermark_text")
+  reportId      String?            @map("report_id")
+  report        DailyReport?       @relation(fields: [reportId], references: [id])
+  remarks       String?
+  status        VerificationStatus @default(PENDING)
+  submittedAt   DateTime           @default(now()) @map("submitted_at")
+
+  @@unique([submittedById, localUuid])
+  @@map("work_proof_attempts")
+}
+
+model TaskComment {
+  id          String      @id @default(uuid())
+  taskId      String      @map("task_id")
+  task        Task        @relation(fields: [taskId], references: [id])
+  userId      String      @map("user_id")
+  user        User        @relation(fields: [userId], references: [id])
+  message     String
+  commentType CommentType @default(INFO) @map("comment_type")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("task_comments")
+}
+
+model TaskChecklistItem {
+  id         String   @id @default(uuid())
+  taskId     String   @map("task_id")
+  task       Task     @relation(fields: [taskId], references: [id])
+  label      String
+  isRequired Boolean  @default(true) @map("is_required")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("task_checklist_items")
+}

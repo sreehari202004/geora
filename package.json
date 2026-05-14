@@ -1,0 +1,18 @@
+{
+  "name": "geora",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/mobile",
+    "apps/api"
+  ],
+  "scripts": {
+    "mobile": "npm --workspace apps/mobile run start",
+    "api:dev": "npm --workspace apps/api run dev",
+    "api:build": "npm --workspace apps/api run build",
+    "api:prisma:generate": "npm --workspace apps/api run prisma:generate",
+    "api:prisma:migrate": "npm --workspace apps/api run prisma:migrate",
+    "lint": "npm --workspaces run lint --if-present",
+    "typecheck": "npm --workspaces run typecheck --if-present"
+  }
+}

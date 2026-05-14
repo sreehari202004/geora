@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Geora",
+    "slug": "geora",
+    "scheme": "geora",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Geora uses the camera to capture proof of completed field work.",
+        "NSLocationWhenInUseUsageDescription": "Geora uses location to attach GPS coordinates to work proofs."
+      }
+    },
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-location",
+      "expo-sqlite"
+    ]
+  }
+}
+
